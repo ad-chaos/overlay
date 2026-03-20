@@ -9,11 +9,13 @@ use crossterm::terminal::{
 };
 use crossterm::{QueueableCommand, cursor::MoveTo, execute, queue};
 
-use crate::vec2::Vec2;
+use crate::{Vec2, strip_ansi};
 
 pub struct Pager {
     // Contains the buffer for viewing
     buffer: String,
+    // Buffer stripped of ansi escape codes
+    plain: String,
     // Number of lines within the buffer
     lines: u32,
     // Terminal size (cols, rows)
@@ -46,8 +48,10 @@ impl Pager {
         let lines = buffer.lines().count() as u32;
         let (columns, rows) = size().expect("couldn't get terminal size");
         let tsize = Vec2::new(columns as u32, rows as u32);
+        let plain = strip_ansi(&buffer);
         Pager {
             buffer,
+            plain,
             lines,
             stdout,
             tsize,
@@ -205,8 +209,11 @@ impl Pager {
         match self.mode {
             VimMode::Normal => self.handle_normal(key)?,
             VimMode::WaitG => {
-                self.render_first()?;
-                self.mode = VimMode::Normal
+                if let KeyCode::Char('g') = key.code {
+                    self.render_first()?;
+                    self.cpos = Vec2::zero();
+                    self.mode = VimMode::Normal
+                }
             }
             _ => {}
         };
