@@ -1,8 +1,11 @@
-pub mod pager;
+mod pager;
 pub use pager::Pager;
 
-pub mod vec2;
-pub use vec2::Vec2;
+mod pos;
+pub use pos::Pos;
 
-pub mod stripper;
+mod stripper;
 pub use stripper::strip_ansi;
+
+mod buffer;
+pub use buffer::Buffer;

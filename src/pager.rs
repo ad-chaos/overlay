@@ -9,21 +9,18 @@ use crossterm::terminal::{
 };
 use crossterm::{QueueableCommand, cursor::MoveTo, execute, queue};
 
-use crate::{Vec2, strip_ansi};
+use crate::{Buffer, Pos};
 
 pub struct Pager {
-    // Contains the buffer for viewing
-    buffer: String,
-    // Buffer stripped of ansi escape codes
-    plain: String,
+    buffer: Buffer,
     // Number of lines within the buffer
     lines: u32,
     // Terminal size (cols, rows)
-    tsize: Vec2,
+    tsize: Pos,
     // Last rendered line's position in the buffer
     vpos: u32,
     // Cursor Position
-    cpos: Vec2,
+    cpos: Pos,
     // Stdout attached to this process
     stdout: Stdout,
     // Active VimMode
@@ -47,16 +44,15 @@ impl Pager {
     pub fn new(buffer: String, stdout: Stdout) -> Pager {
         let lines = buffer.lines().count() as u32;
         let (columns, rows) = size().expect("couldn't get terminal size");
-        let tsize = Vec2::new(columns as u32, rows as u32);
-        let plain = strip_ansi(&buffer);
+        let tsize = Pos::new(columns as u32, rows as u32);
+        let buffer = Buffer::from(buffer);
         Pager {
             buffer,
-            plain,
             lines,
             stdout,
             tsize,
             vpos: 0,
-            cpos: Vec2::zero(),
+            cpos: Pos::zero(),
             mode: VimMode::Normal,
         }
     }
@@ -82,7 +78,7 @@ impl Pager {
             match event::read()? {
                 Event::Key(key) => self.handle_key(key)?,
                 Event::Resize(nc, nr) => {
-                    self.tsize = Vec2::new(nr as u32, nc as u32);
+                    self.tsize = Pos::new(nr as u32, nc as u32);
                 }
                 _ => {}
             }
@@ -102,13 +98,13 @@ impl Pager {
     }
 
     fn paint_lines(&mut self, buf_start: usize, cur_start: usize, len: usize) -> io::Result<()> {
-        for (i, line) in self.buffer.lines().skip(buf_start).take(len).enumerate() {
+        for (i, line) in self.buffer.line_indicies(buf_start, len) {
             self.stdout
                 .queue(MoveTo(0, (i + cur_start) as u16))?
                 .queue(Clear(ClearType::CurrentLine))?
                 .queue(Print(line))?;
         }
-        self.cpos = cursor::position().map(|(x, y)| Vec2::new(x as u32, y as u32))?;
+        self.cpos = cursor::position().map(|(x, y)| Pos::new(x as u32, y as u32))?;
         Ok(())
     }
 
@@ -211,7 +207,7 @@ impl Pager {
             VimMode::WaitG => {
                 if let KeyCode::Char('g') = key.code {
                     self.render_first()?;
-                    self.cpos = Vec2::zero();
+                    self.cpos = Pos::zero();
                     self.mode = VimMode::Normal
                 }
             }

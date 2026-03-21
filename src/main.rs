@@ -1,4 +1,4 @@
-use overlay::pager::Pager;
+use overlay::Pager;
 use std::io::{self, stdout};
 
 fn main() -> io::Result<()> {

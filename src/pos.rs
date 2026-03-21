@@ -1,70 +1,70 @@
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-pub struct Vec2 {
+pub struct Pos {
     pub x: u32,
     pub y: u32,
 }
 
-impl Vec2 {
-    pub const fn new(x: u32, y: u32) -> Vec2 {
-        Vec2 { x, y }
+impl Pos {
+    pub const fn new(x: u32, y: u32) -> Pos {
+        Pos { x, y }
     }
 
-    pub fn zero() -> Vec2 {
-        Vec2::new(0, 0)
+    pub fn zero() -> Pos {
+        Pos::new(0, 0)
     }
 
-    pub fn up(mut self) -> Vec2 {
+    pub fn up(mut self) -> Pos {
         self.y = self.y.saturating_sub(1);
         self
     }
 
-    pub fn down(mut self) -> Vec2 {
+    pub fn down(mut self) -> Pos {
         self.y += 1;
         self
     }
 
-    pub fn left(mut self) -> Vec2 {
+    pub fn left(mut self) -> Pos {
         self.x = self.x.saturating_sub(1);
         self
     }
 
-    pub fn right(mut self) -> Vec2 {
+    pub fn right(mut self) -> Pos {
         self.x += 1;
         self
     }
 }
 
-impl Add for Vec2 {
-    type Output = Vec2;
+impl Add for Pos {
+    type Output = Pos;
 
     fn add(self, rhs: Self) -> Self::Output {
-        Vec2 {
+        Pos {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
         }
     }
 }
 
-impl AddAssign for Vec2 {
+impl AddAssign for Pos {
     fn add_assign(&mut self, rhs: Self) {
         *self = self.add(rhs)
     }
 }
 
-impl Sub for Vec2 {
-    type Output = Vec2;
+impl Sub for Pos {
+    type Output = Pos;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        Vec2 {
+        Pos {
             x: self.x - rhs.x,
             y: self.y - rhs.y,
         }
     }
 }
 
-impl SubAssign for Vec2 {
+impl SubAssign for Pos {
     fn sub_assign(&mut self, rhs: Self) {
         *self = self.sub(rhs)
     }
