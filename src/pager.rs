@@ -198,6 +198,7 @@ impl Pager {
             KeyCode::Char('g') => WaitG,
             _ => self.mode,
         };
+
         Ok(())
     }
 
