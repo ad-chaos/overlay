@@ -12,13 +12,14 @@ use crossterm::{QueueableCommand, cursor::MoveTo, execute, queue};
 use crate::{Buffer, Pos};
 
 pub struct Pager {
+    // Contents to be paged
     buffer: Buffer,
     // Number of lines within the buffer
     lines: u32,
     // Terminal size (cols, rows)
     tsize: Pos,
     // Last rendered line's position in the buffer
-    bpos: u32,
+    bpos: Pos,
     // Cursor Position
     cpos: Pos,
     // Stdout attached to this process
@@ -51,7 +52,7 @@ impl Pager {
             lines,
             stdout,
             tsize,
-            bpos: 0,
+            bpos: Pos::zero(),
             cpos: Pos::zero(),
             mode: VimMode::Normal,
         }
@@ -109,32 +110,32 @@ impl Pager {
     }
 
     fn render_scroll_up(&mut self, scroll: u32) -> io::Result<()> {
-        let (buf_start, cur_start) = (self.bpos, self.tsize.y - scroll);
+        let (buf_start, cur_start) = (self.bpos.y, self.tsize.y - scroll);
 
         self.stdout.queue(ScrollUp(scroll as u16))?;
         self.paint_lines(buf_start as usize, cur_start as usize, scroll as usize)?;
-        self.bpos = self.bpos.saturating_add(scroll);
+        self.bpos.y = self.bpos.y.saturating_add(scroll);
 
         Ok(())
     }
 
     fn render_scroll_down(&mut self, scroll: u32) -> io::Result<()> {
-        let (buf_start, cur_start) = (self.bpos - scroll - self.tsize.y, 0);
+        let (buf_start, cur_start) = (self.bpos.y - scroll - self.tsize.y, 0);
 
         self.stdout.queue(ScrollDown(scroll as u16))?;
         self.paint_lines(buf_start as usize, cur_start as usize, scroll as usize)?;
-        self.bpos = self.bpos.saturating_sub(scroll);
+        self.bpos.y = self.bpos.y.saturating_sub(scroll);
 
         Ok(())
     }
 
     fn render_first(&mut self) -> io::Result<()> {
-        self.bpos = self.tsize.y;
+        self.bpos.y = self.tsize.y;
         self.paint_lines(0, 0, self.tsize.y as usize)
     }
 
     fn render_last(&mut self) -> io::Result<()> {
-        self.bpos = self.lines;
+        self.bpos.y = self.lines;
         self.paint_lines(
             (self.lines - self.tsize.y) as usize,
             0,
@@ -149,7 +150,7 @@ impl Pager {
             KeyCode::Char('j') => {
                 if self.cpos.y + 1 < self.tsize.y {
                     self.cpos = self.cpos.down();
-                } else if self.bpos < self.lines {
+                } else if self.bpos.y < self.lines {
                     self.render_scroll_up(1)?;
                 }
                 Normal
@@ -157,7 +158,7 @@ impl Pager {
             KeyCode::Char('k') => {
                 if self.cpos.y != 0 {
                     self.cpos = self.cpos.up();
-                } else if self.bpos > self.tsize.y {
+                } else if self.bpos.y > self.tsize.y {
                     self.render_scroll_down(1)?;
                 }
                 Normal
@@ -196,6 +197,12 @@ impl Pager {
                 Normal
             }
             KeyCode::Char('g') => WaitG,
+            KeyCode::Char('w') => {
+                self.cpos.x = self
+                    .buffer
+                    .word_right_from((self.bpos.y - (self.tsize.y - self.cpos.y)) as usize, self.cpos.x as usize);
+                Normal
+            }
             _ => self.mode,
         };
 
@@ -220,8 +227,7 @@ impl Pager {
 
     pub fn end(&mut self) -> io::Result<()> {
         execute!(self.stdout, LeaveAlternateScreen)?;
-        disable_raw_mode()?;
-        Ok(())
+        disable_raw_mode()
     }
 }
 
