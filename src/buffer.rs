@@ -1,6 +1,8 @@
-use crate::strip_ansi;
+use crate::{Pos, strip_ansi};
 
 pub struct Buffer {
+    // Last rendered buffer position
+    pub(crate) bpos: Pos,
     // Style contents to be paged
     styled: String,
     // Line spans of paged contents
@@ -18,6 +20,7 @@ impl Buffer {
         let plain_lines = line_spans(&plain);
 
         Buffer {
+            bpos: Pos::zero(),
             styled,
             styled_lines,
             plain,
@@ -32,7 +35,7 @@ impl Buffer {
             .enumerate()
     }
 
-    pub fn word_right_from(&self, line: usize, col: usize) -> u32 {
+    pub fn word_right_from(&self, line: usize, col: usize) -> usize {
         let (lstart, lend) = self.plain_lines[line];
         let bline = &self.plain[lstart..lend];
 
@@ -40,7 +43,7 @@ impl Buffer {
         let Some(nisk) =
             bline[col..].find(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9'))
         else {
-            return col as u32;
+            return col;
         };
 
         // // Find the next 'isk' character
@@ -48,7 +51,7 @@ impl Buffer {
             .find(|c| matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9'))
             .unwrap_or(0);
 
-        (col + nisk + ncol) as u32
+        col + nisk + ncol
     }
 }
 

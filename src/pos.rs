@@ -2,13 +2,13 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Pos {
-    pub x: u32,
-    pub y: u32,
+    pub col: usize,
+    pub line: usize,
 }
 
 impl Pos {
-    pub const fn new(x: u32, y: u32) -> Pos {
-        Pos { x, y }
+    pub const fn new(x: usize, y: usize) -> Pos {
+        Pos { col: x, line: y }
     }
 
     pub fn zero() -> Pos {
@@ -16,22 +16,22 @@ impl Pos {
     }
 
     pub fn up(mut self) -> Pos {
-        self.y = self.y.saturating_sub(1);
+        self.line = self.line.saturating_sub(1);
         self
     }
 
     pub fn down(mut self) -> Pos {
-        self.y += 1;
+        self.line += 1;
         self
     }
 
     pub fn left(mut self) -> Pos {
-        self.x = self.x.saturating_sub(1);
+        self.col = self.col.saturating_sub(1);
         self
     }
 
     pub fn right(mut self) -> Pos {
-        self.x += 1;
+        self.col += 1;
         self
     }
 }
@@ -41,8 +41,8 @@ impl Add for Pos {
 
     fn add(self, rhs: Self) -> Self::Output {
         Pos {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
+            col: self.col + rhs.col,
+            line: self.line + rhs.line,
         }
     }
 }
@@ -58,8 +58,8 @@ impl Sub for Pos {
 
     fn sub(self, rhs: Self) -> Self::Output {
         Pos {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y,
+            col: self.col - rhs.col,
+            line: self.line - rhs.line,
         }
     }
 }

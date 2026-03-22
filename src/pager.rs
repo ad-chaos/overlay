@@ -15,11 +15,9 @@ pub struct Pager {
     // Contents to be paged
     buffer: Buffer,
     // Number of lines within the buffer
-    lines: u32,
+    lines: usize,
     // Terminal size (cols, rows)
     tsize: Pos,
-    // Last rendered line's position in the buffer
-    bpos: Pos,
     // Cursor Position
     cpos: Pos,
     // Stdout attached to this process
@@ -43,16 +41,15 @@ impl VimMode {
 
 impl Pager {
     pub fn new(buffer: String, stdout: Stdout) -> Pager {
-        let lines = buffer.lines().count() as u32;
+        let lines = buffer.lines().count();
         let (columns, rows) = size().expect("couldn't get terminal size");
-        let tsize = Pos::new(columns as u32, rows as u32);
+        let tsize = Pos::new(columns as usize, rows as usize);
         let buffer = Buffer::new(buffer);
         Pager {
             buffer,
             lines,
             stdout,
             tsize,
-            bpos: Pos::zero(),
             cpos: Pos::zero(),
             mode: VimMode::Normal,
         }
@@ -79,13 +76,13 @@ impl Pager {
             match event::read()? {
                 Event::Key(key) => self.handle_key(key)?,
                 Event::Resize(nc, nr) => {
-                    self.tsize = Pos::new(nr as u32, nc as u32);
+                    self.tsize = Pos::new(nr as usize, nc as usize);
                 }
                 _ => {}
             }
 
             self.stdout
-                .queue(MoveTo(self.cpos.x as u16, self.cpos.y as u16))?
+                .queue(MoveTo(self.cpos.col as u16, self.cpos.line as u16))?
                 .queue(EndSynchronizedUpdate)?;
             self.stdout.flush()?;
         }
@@ -105,42 +102,38 @@ impl Pager {
                 .queue(Clear(ClearType::CurrentLine))?
                 .queue(Print(line))?;
         }
-        self.cpos = cursor::position().map(|(x, y)| Pos::new(x as u32, y as u32))?;
+        self.cpos = cursor::position().map(|(x, y)| Pos::new(x as usize, y as usize))?;
         Ok(())
     }
 
-    fn render_scroll_up(&mut self, scroll: u32) -> io::Result<()> {
-        let (buf_start, cur_start) = (self.bpos.y, self.tsize.y - scroll);
+    fn render_scroll_up(&mut self, scroll: usize) -> io::Result<()> {
+        let (buf_start, cur_start) = (self.buffer.bpos.line, self.tsize.line - scroll);
 
         self.stdout.queue(ScrollUp(scroll as u16))?;
-        self.paint_lines(buf_start as usize, cur_start as usize, scroll as usize)?;
-        self.bpos.y = self.bpos.y.saturating_add(scroll);
+        self.paint_lines(buf_start, cur_start, scroll)?;
+        self.buffer.bpos.line = self.buffer.bpos.line.saturating_add(scroll);
 
         Ok(())
     }
 
-    fn render_scroll_down(&mut self, scroll: u32) -> io::Result<()> {
-        let (buf_start, cur_start) = (self.bpos.y - scroll - self.tsize.y, 0);
+    fn render_scroll_down(&mut self, scroll: usize) -> io::Result<()> {
+        let (buf_start, cur_start) = (self.buffer.bpos.line - scroll - self.tsize.line, 0);
 
         self.stdout.queue(ScrollDown(scroll as u16))?;
-        self.paint_lines(buf_start as usize, cur_start as usize, scroll as usize)?;
-        self.bpos.y = self.bpos.y.saturating_sub(scroll);
+        self.paint_lines(buf_start, cur_start, scroll)?;
+        self.buffer.bpos.line = self.buffer.bpos.line.saturating_sub(scroll);
 
         Ok(())
     }
 
     fn render_first(&mut self) -> io::Result<()> {
-        self.bpos.y = self.tsize.y;
-        self.paint_lines(0, 0, self.tsize.y as usize)
+        self.buffer.bpos.line = self.tsize.line;
+        self.paint_lines(0, 0, self.tsize.line)
     }
 
     fn render_last(&mut self) -> io::Result<()> {
-        self.bpos.y = self.lines;
-        self.paint_lines(
-            (self.lines - self.tsize.y) as usize,
-            0,
-            self.tsize.y as usize,
-        )
+        self.buffer.bpos.line = self.lines;
+        self.paint_lines(self.lines - self.tsize.line, 0, self.tsize.line)
     }
 
     fn handle_normal(&mut self, key: KeyEvent) -> io::Result<()> {
@@ -148,17 +141,17 @@ impl Pager {
         self.mode = match key.code {
             KeyCode::Char('q') => Quit,
             KeyCode::Char('j') => {
-                if self.cpos.y + 1 < self.tsize.y {
+                if self.cpos.line + 1 < self.tsize.line {
                     self.cpos = self.cpos.down();
-                } else if self.bpos.y < self.lines {
+                } else if self.buffer.bpos.line < self.lines {
                     self.render_scroll_up(1)?;
                 }
                 Normal
             }
             KeyCode::Char('k') => {
-                if self.cpos.y != 0 {
+                if self.cpos.line != 0 {
                     self.cpos = self.cpos.up();
-                } else if self.bpos.y > self.tsize.y {
+                } else if self.buffer.bpos.line > self.tsize.line {
                     self.render_scroll_down(1)?;
                 }
                 Normal
@@ -169,7 +162,7 @@ impl Pager {
             }
             KeyCode::Char('l') => {
                 self.cpos = self.cpos.right();
-                self.cpos.x = self.cpos.x.min(self.tsize.x - 1);
+                self.cpos.col = self.cpos.col.min(self.tsize.col - 1);
                 Normal
             }
             KeyCode::Char('G') => {
@@ -177,30 +170,31 @@ impl Pager {
                 Normal
             }
             KeyCode::Char('0') => {
-                self.cpos.x = 0;
+                self.cpos.col = 0;
                 Normal
             }
             KeyCode::Char('$') => {
-                self.cpos.x = self.tsize.x;
+                self.cpos.col = self.tsize.col;
                 Normal
             }
             KeyCode::Char('H') => {
-                self.cpos.y = 0;
+                self.cpos.line = 0;
                 Normal
             }
             KeyCode::Char('L') => {
-                self.cpos.y = self.tsize.y - 1;
+                self.cpos.line = self.tsize.line - 1;
                 Normal
             }
             KeyCode::Char('M') => {
-                self.cpos.y = (self.tsize.y - 1) / 2;
+                self.cpos.line = (self.tsize.line - 1) / 2;
                 Normal
             }
             KeyCode::Char('g') => WaitG,
             KeyCode::Char('w') => {
-                self.cpos.x = self
-                    .buffer
-                    .word_right_from((self.bpos.y - (self.tsize.y - self.cpos.y)) as usize, self.cpos.x as usize);
+                self.cpos.col = self.buffer.word_right_from(
+                    self.buffer.bpos.line - (self.tsize.line - self.cpos.line),
+                    self.cpos.col,
+                );
                 Normal
             }
             _ => self.mode,
