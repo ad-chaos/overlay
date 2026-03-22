@@ -45,7 +45,7 @@ impl Pager {
         let lines = buffer.lines().count() as u32;
         let (columns, rows) = size().expect("couldn't get terminal size");
         let tsize = Pos::new(columns as u32, rows as u32);
-        let buffer = Buffer::from(buffer);
+        let buffer = Buffer::new(buffer);
         Pager {
             buffer,
             lines,
