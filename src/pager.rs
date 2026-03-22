@@ -18,7 +18,7 @@ pub struct Pager {
     // Terminal size (cols, rows)
     tsize: Pos,
     // Last rendered line's position in the buffer
-    vpos: u32,
+    bpos: u32,
     // Cursor Position
     cpos: Pos,
     // Stdout attached to this process
@@ -51,7 +51,7 @@ impl Pager {
             lines,
             stdout,
             tsize,
-            vpos: 0,
+            bpos: 0,
             cpos: Pos::zero(),
             mode: VimMode::Normal,
         }
@@ -109,32 +109,32 @@ impl Pager {
     }
 
     fn render_scroll_up(&mut self, scroll: u32) -> io::Result<()> {
-        let (buf_start, cur_start) = (self.vpos, self.tsize.y - scroll);
+        let (buf_start, cur_start) = (self.bpos, self.tsize.y - scroll);
 
         self.stdout.queue(ScrollUp(scroll as u16))?;
         self.paint_lines(buf_start as usize, cur_start as usize, scroll as usize)?;
-        self.vpos = self.vpos.saturating_add(scroll);
+        self.bpos = self.bpos.saturating_add(scroll);
 
         Ok(())
     }
 
     fn render_scroll_down(&mut self, scroll: u32) -> io::Result<()> {
-        let (buf_start, cur_start) = (self.vpos - scroll - self.tsize.y, 0);
+        let (buf_start, cur_start) = (self.bpos - scroll - self.tsize.y, 0);
 
         self.stdout.queue(ScrollDown(scroll as u16))?;
         self.paint_lines(buf_start as usize, cur_start as usize, scroll as usize)?;
-        self.vpos = self.vpos.saturating_sub(scroll);
+        self.bpos = self.bpos.saturating_sub(scroll);
 
         Ok(())
     }
 
     fn render_first(&mut self) -> io::Result<()> {
-        self.vpos = self.tsize.y;
+        self.bpos = self.tsize.y;
         self.paint_lines(0, 0, self.tsize.y as usize)
     }
 
     fn render_last(&mut self) -> io::Result<()> {
-        self.vpos = self.lines;
+        self.bpos = self.lines;
         self.paint_lines(
             (self.lines - self.tsize.y) as usize,
             0,
@@ -149,7 +149,7 @@ impl Pager {
             KeyCode::Char('j') => {
                 if self.cpos.y + 1 < self.tsize.y {
                     self.cpos = self.cpos.down();
-                } else if self.vpos < self.lines {
+                } else if self.bpos < self.lines {
                     self.render_scroll_up(1)?;
                 }
                 Normal
@@ -157,7 +157,7 @@ impl Pager {
             KeyCode::Char('k') => {
                 if self.cpos.y != 0 {
                     self.cpos = self.cpos.up();
-                } else if self.vpos > self.tsize.y {
+                } else if self.bpos > self.tsize.y {
                     self.render_scroll_down(1)?;
                 }
                 Normal
