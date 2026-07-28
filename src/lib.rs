@@ -9,3 +9,4 @@ pub use stripper::strip_ansi;
 
 mod buffer;
 pub use buffer::Buffer;
+pub use buffer::unicode;

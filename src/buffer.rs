@@ -2,6 +2,8 @@ use crossterm::{Command, cursor};
 
 use crate::{Pos, strip_ansi};
 
+pub mod unicode;
+
 pub struct Buffer {
     // Current cursor position
     cpos: Pos,
@@ -63,19 +65,35 @@ impl Buffer {
             .enumerate()
     }
 
+    fn can_cursor_down(&self) -> bool {
+        self.cpos.line + 1 < self.tsize.line
+    }
+
+    fn can_scroll_down(&self) -> bool {
+        self.bpos.line < self.lines()
+    }
+
     pub fn cursor_down(&mut self) -> bool {
-        if self.cpos.line + 1 < self.tsize.line {
+        if self.can_cursor_down() {
             self.cpos = self.cpos.down();
-        } else if self.bpos.line < self.lines() {
+        } else if self.can_scroll_down() {
             return true;
         }
         false
     }
 
+    fn can_cursor_up(&self) -> bool {
+        self.cpos.line != 0
+    }
+
+    fn can_scroll_up(&self) -> bool {
+        self.bpos.line > self.tsize.line
+    }
+
     pub fn cursor_up(&mut self) -> bool {
-        if self.cpos.line != 0 {
+        if self.can_cursor_up() {
             self.cpos = self.cpos.up();
-        } else if self.bpos.line > self.tsize.line {
+        } else if self.can_scroll_up() {
             return true;
         }
         false
